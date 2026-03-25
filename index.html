@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>소설 협업 — 프로토타입</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;600;700&family=Noto+Sans+KR:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0f0e0c;
+  --bg2:      #181714;
+  --surface:  #2a2720;
+  --surface2: #343028;
+  --line:     #3d3930;
+  --muted:    #7a7060;
+  --text:     #e8e0d0;
+  --text2:    #b8ad98;
+  --accent:   #c8a96e;
+  --green:    #6dab7a;
+  --red:      #c06060;
+  --blue:     #7aa8c8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; height: 100dvh; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'Noto Sans KR', sans-serif; }
+.app { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+
+/* TOP BAR */
+.topbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px;
+  padding-top: max(9px, env(safe-area-inset-top));
+  background: var(--bg2); border-bottom: 1px solid var(--line);
+  flex-shrink: 0; z-index: 100;
+}
+.tb-menu { width: 36px; height: 36px; border-radius: 50%; background: var(--surface); border: none; color: var(--text2); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s; }
+.tb-menu:active { background: var(--surface2); }
+.tb-info { flex: 1; min-width: 0; }
+.tb-project { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+.tb-chapter { font-size: 15px; font-weight: 600; font-family: 'Noto Serif KR', serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.tb-badge { display: flex; align-items: center; gap: 4px; background: rgba(109,171,122,.13); border: 1px solid rgba(109,171,122,.28); border-radius: 12px; padding: 4px 9px; font-size: 11px; color: var(--green); }
+.tb-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); animation: blink 2s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+.tb-btn { height: 33px; padding: 0 11px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); color: var(--text2); font-size: 12px; cursor: pointer; white-space: nowrap; font-family: 'Noto Sans KR', sans-serif; display: flex; align-items: center; gap: 4px; transition: all .15s; }
+.tb-btn:active { background: var(--surface2); transform: scale(.97); }
+.tb-btn.primary { background: var(--accent); color: var(--bg); border-color: transparent; font-weight: 500; }
+
+/* BODY */
+.body { flex: 1; display: flex; overflow: hidden; position: relative; }
+
+/* ════════════════════════════════
+   SIDEBAR
+   세로: 42px 슬림 (챕터 번호만)
+   가로: 180px 풀
+════════════════════════════════ */
+.sidebar { background: var(--bg2); border-right: 1px solid var(--line); flex-shrink: 0; display: flex; overflow: hidden; transition: width .26s cubic-bezier(.4,0,.2,1); z-index: 50; }
+
+/* 세로 기본 — 슬림 */
+@media (orientation: portrait) {
+  .sidebar { width: 42px; }
+  .sidebar.p-open { width: 180px; }
+  .sb-slim { display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 3px; flex-shrink: 0; width: 42px; overflow: hidden; }
+  .sb-full { display: none; flex-direction: column; width: 138px; overflow: hidden; }
+  .sidebar.p-open .sb-full { display: flex; }
+}
+/* 가로 — 풀 항상 보임 */
+@media (orientation: landscape) {
+  .sidebar { width: 180px; }
+  .sb-slim { display: none; }
+  .sb-full { display: flex; flex-direction: column; width: 180px; overflow: hidden; }
+}
+
+/* 슬림 탭 */
+.st { width: 34px; height: 42px; border-radius: 7px; border: none; background: transparent; color: var(--muted); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: all .14s; position: relative; flex-shrink: 0; }
+.st:active { background: var(--surface); }
+.st.cur { color: var(--accent); background: rgba(200,169,110,.09); }
+.st.cur::before { content: ''; position: absolute; left: 0; top: 28%; bottom: 28%; width: 2px; border-radius: 0 1px 1px 0; background: var(--accent); }
+.st-num { font-size: 9px; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+.st-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+.st-divider { width: 18px; height: 1px; background: var(--line); margin: 4px 0; flex-shrink: 0; }
+
+/* 풀 사이드바 */
+.sb-head { padding: 11px 11px 8px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
+.sb-title { font-size: 10px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; font-weight: 500; }
+.sb-add { width: 22px; height: 22px; border-radius: 50%; background: var(--surface); border: none; color: var(--accent); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.ch-list { flex: 1; overflow-y: auto; padding: 5px; }
+.chi { padding: 8px 8px; border-radius: 7px; cursor: pointer; margin-bottom: 1px; transition: background .12s; position: relative; }
+.chi:hover { background: var(--surface); }
+.chi.cur { background: var(--surface2); }
+.chi.cur::before { content: ''; position: absolute; left: 0; top: 24%; bottom: 24%; width: 2px; border-radius: 0 1px 1px 0; background: var(--accent); }
+.chi-n { font-size: 9px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+.chi-t { font-size: 12px; font-family: 'Noto Serif KR', serif; color: var(--text); line-height: 1.4; margin-top: 1px; }
+.chi-s { font-size: 9px; color: var(--muted); margin-top: 2px; display: flex; gap: 5px; }
+.lm { color: var(--green); }
+.lo { color: var(--blue); }
+
+/* EDITOR WRAP */
+.editor-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; min-width: 0; }
+
+/* 포맷바 */
+.fmtbar { display: flex; align-items: center; gap: 2px; padding: 5px 10px; background: var(--bg2); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; flex-shrink: 0; }
+.fmtbar::-webkit-scrollbar { display: none; }
+.fb { min-width: 32px; height: 32px; padding: 0 7px; border-radius: 7px; border: none; background: transparent; color: var(--text2); font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .13s; flex-shrink: 0; font-family: 'Noto Sans KR', sans-serif; }
+.fb:active { background: var(--surface); transform: scale(.93); }
+.fb.on { background: var(--surface); color: var(--accent); }
+.fb-sep { width: 1px; height: 18px; background: var(--line); margin: 0 3px; flex-shrink: 0; }
+
+/* 에디터 스크롤 */
+.editor-scroll { flex: 1; overflow-y: auto; padding: 28px 24px 48px; position: relative; }
+@media (orientation: landscape) { .editor-scroll { padding: 20px 28px 40px; } }
+@media (min-width: 700px) { .editor-scroll { padding: 36px 56px 56px; max-width: 720px; margin: 0 auto; width: 100%; } }
+
+/* 챕터 제목 — 장식 없이 */
+.ch-title-input { font-family: 'Noto Serif KR', serif; font-size: 20px; font-weight: 600; color: var(--text); background: transparent; border: none; outline: none; width: 100%; line-height: 1.5; caret-color: var(--accent); margin-bottom: 22px; display: block; }
+
+/* 본문 — 텍스트에만 집중 */
+.editor-body { font-family: 'Noto Serif KR', serif; font-size: 16px; line-height: 2.1; color: var(--text); outline: none; min-height: 200px; caret-color: var(--accent); white-space: pre-wrap; word-break: break-word; }
+.editor-body p { text-indent: 1.5em; margin: 0; }
+.editor-body p + p { margin-top: .15em; }
+
+/* 인라인 메모 */
+.mhl { background: rgba(200,169,110,.14); border-bottom: 1.5px solid rgba(200,169,110,.45); border-radius: 2px; cursor: pointer; }
+/* diff */
+.da { background: rgba(109,171,122,.2); border-radius: 2px; }
+.dd { background: rgba(192,96,96,.17); text-decoration: line-through; color: var(--red); border-radius: 2px; }
+
+/* 상태바 */
+.statusbar { display: flex; align-items: center; justify-content: space-between; padding: 5px 14px; padding-bottom: max(5px, env(safe-area-inset-bottom)); background: var(--bg2); border-top: 1px solid var(--line); flex-shrink: 0; }
+.st-left { display: flex; align-items: center; gap: 10px; }
+.st-i { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+.st-save { font-size: 10px; color: var(--accent); background: none; border: none; cursor: pointer; font-family: 'Noto Sans KR', sans-serif; padding: 4px 6px; }
+
+/* ════════════════════════════════
+   OVAL DOCK
+════════════════════════════════ */
+.oval-dock { position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 5px; z-index: 60; pointer-events: none; }
+.oval-group { display: flex; flex-direction: row-reverse; align-items: center; pointer-events: all; position: relative; }
+.oval-trig { width: 42px; height: 50px; background: var(--surface2); border: 1px solid var(--line); border-right: none; border-radius: 25px 0 0 25px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: all .22s cubic-bezier(.4,0,.2,1); z-index: 2; }
+.oval-trig:hover, .oval-trig.on { background: var(--surface); width: 48px; }
+.oval-trig.on { border-color: var(--accent); }
+.ot-ic { font-size: 15px; line-height: 1; }
+.ot-lb { font-size: 7px; color: var(--muted); font-family: 'Noto Sans KR', sans-serif; }
+.oval-trig.on .ot-lb { color: var(--accent); }
+.oval-exp { display: flex; align-items: center; gap: 8px; overflow: hidden; max-width: 0; opacity: 0; transition: max-width .27s cubic-bezier(.4,0,.2,1), opacity .18s; padding-right: 6px; }
+.oval-group.open .oval-exp { max-width: 220px; opacity: 1; }
+.sub { width: 42px; height: 42px; border-radius: 50%; background: var(--surface); border: 1px solid var(--line); color: var(--text2); font-size: 17px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .14s; position: relative; }
+.sub:active { transform: scale(.88); }
+.sub:hover { border-color: var(--accent); color: var(--text); }
+.sub.hi { background: rgba(200,169,110,.13); border-color: var(--accent); color: var(--accent); }
+.sub[data-tip]::after { content: attr(data-tip); position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%); font-size: 8px; color: var(--muted); white-space: nowrap; font-family: 'Noto Sans KR', sans-serif; pointer-events: none; }
+
+/* 가로 900px+ — 오벌 숨김 */
+@media (orientation: landscape) and (min-width: 900px) { .oval-dock { display: none; } }
+
+/* ════════════════════════════════
+   MEMO PANEL
+════════════════════════════════ */
+.memo-panel { width: 258px; flex-shrink: 0; background: var(--bg2); border-left: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden; position: absolute; right: 0; top: 0; bottom: 0; transform: translateX(100%); transition: transform .27s cubic-bezier(.4,0,.2,1); z-index: 40; }
+.memo-panel.open { transform: translateX(0); }
+@media (min-width: 900px) and (orientation: landscape) { .memo-panel { position: relative; transform: none !important; } }
+.mp-head { padding: 11px 12px 9px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
+.mp-title { font-size: 12px; font-weight: 500; color: var(--text2); }
+.mp-x { width: 25px; height: 25px; border-radius: 50%; background: var(--surface); border: none; color: var(--muted); font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.mp-tabs { display: flex; border-bottom: 1px solid var(--line); padding: 0 10px; }
+.mp-tab { padding: 7px 9px; font-size: 11px; color: var(--muted); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .13s; font-family: 'Noto Sans KR', sans-serif; }
+.mp-tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+.mp-body { flex: 1; overflow-y: auto; padding: 9px; }
+.mc { background: var(--surface); border-radius: 8px; padding: 9px 10px; margin-bottom: 6px; border-left: 2px solid var(--accent); }
+.mc.done { opacity: .42; border-left-color: var(--muted); }
+.mc-u { font-size: 10px; color: var(--accent); font-weight: 500; display: flex; justify-content: space-between; margin-bottom: 3px; }
+.mc-t { font-size: 12px; color: var(--text); line-height: 1.6; }
+.mc-a { font-size: 9px; color: var(--muted); margin-top: 4px; font-style: italic; }
+.mc-acts { display: flex; gap: 5px; margin-top: 6px; }
+.mc-btn { font-size: 10px; padding: 3px 7px; border-radius: 5px; background: var(--surface2); border: none; color: var(--text2); cursor: pointer; font-family: 'Noto Sans KR', sans-serif; }
+
+/* SYNOPSIS BOTTOM SHEET */
+.syn-ov { position: fixed; inset: 0; z-index: 200; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.syn-ov.open { pointer-events: all; opacity: 1; }
+.syn-bg { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
+.syn-sh { position: absolute; bottom: 0; left: 0; right: 0; max-height: 60dvh; background: var(--bg2); border-radius: 18px 18px 0 0; border-top: 1px solid var(--line); padding: 0 20px 20px; transform: translateY(20px); transition: transform .27s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; }
+.syn-ov.open .syn-sh { transform: none; }
+.syn-handle { width: 32px; height: 3px; background: var(--line); border-radius: 2px; margin: 13px auto 13px; flex-shrink: 0; }
+.syn-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-shrink: 0; }
+.syn-ttl { font-size: 14px; font-weight: 600; font-family: 'Noto Serif KR', serif; }
+.syn-ver { font-size: 9px; color: var(--muted); font-family: 'JetBrains Mono', monospace; background: var(--surface); padding: 2px 7px; border-radius: 5px; }
+.syn-txt { flex: 1; overflow-y: auto; font-family: 'Noto Serif KR', serif; font-size: 13px; line-height: 1.85; color: var(--text2); }
+.syn-txt b { color: var(--accent); font-weight: 600; }
+
+/* DIFF MODAL */
+.diff-modal { position: fixed; inset: 0; z-index: 200; background: var(--bg); display: flex; flex-direction: column; transform: translateY(100%); transition: transform .3s cubic-bezier(.4,0,.2,1); }
+.diff-modal.open { transform: none; }
+.diff-head { padding: 11px 13px; padding-top: max(11px, env(safe-area-inset-top)); background: var(--bg2); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+.diff-x { width: 34px; height: 34px; border-radius: 50%; background: var(--surface); border: none; color: var(--text2); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.diff-hi { flex: 1; }
+.diff-ttl { font-size: 14px; font-weight: 600; font-family: 'Noto Serif KR', serif; }
+.diff-sub { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+.diff-body { flex: 1; display: flex; overflow: hidden; }
+.diff-col { flex: 1; padding: 16px 13px; overflow-y: auto; }
+.diff-col:first-child { border-right: 1px solid var(--line); }
+.diff-col-lbl { font-size: 9px; color: var(--muted); font-family: 'JetBrains Mono', monospace; letter-spacing: .06em; text-transform: uppercase; display: flex; align-items: center; gap: 5px; margin-bottom: 14px; }
+.diff-col-lbl i { width: 5px; height: 5px; border-radius: 50%; display: inline-block; font-style: normal; }
+.diff-txt { font-family: 'Noto Serif KR', serif; font-size: 14px; line-height: 2.0; color: var(--text); }
+.diff-foot { display: flex; gap: 10px; padding: 11px 13px; padding-bottom: max(11px, env(safe-area-inset-bottom)); background: var(--bg2); border-top: 1px solid var(--line); }
+.dact { flex: 1; height: 46px; border-radius: 12px; border: 1px solid var(--line); font-size: 14px; font-weight: 500; cursor: pointer; transition: all .15s; font-family: 'Noto Sans KR', sans-serif; }
+.dact:active { transform: scale(.97); }
+.dact.rej { background: rgba(192,96,96,.1); color: var(--red); border-color: rgba(192,96,96,.28); }
+.dact.acc { background: var(--accent); color: var(--bg); border-color: transparent; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 62px; left: 50%; transform: translateX(-50%) translateY(10px); background: var(--surface2); color: var(--text); padding: 8px 16px; border-radius: 16px; font-size: 12px; border: 1px solid var(--line); opacity: 0; transition: all .2s; z-index: 400; white-space: nowrap; pointer-events: none; font-family: 'Noto Sans KR', sans-serif; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* 가로 세부 조정 */
+@media (orientation: landscape) and (max-height: 500px) {
+  .editor-scroll { padding: 10px 22px 28px; }
+  .fmtbar { padding: 3px 8px; }
+  .fb { height: 28px; }
+  .topbar { padding: 6px 12px; }
+  .ch-title-input { font-size: 17px; margin-bottom: 12px; }
+  .editor-body { font-size: 14px; line-height: 1.9; }
+  .oval-trig { height: 42px; }
+  .oval-dock { gap: 3px; }
+}
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+
+/* ════════════════════════════════
+   THEME PANEL
+════════════════════════════════ */
+.theme-ov { position: fixed; inset: 0; z-index: 300; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.theme-ov.open { pointer-events: all; opacity: 1; }
+.theme-bg { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+.theme-sh {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: var(--bg2); border-radius: 20px 20px 0 0;
+  border-top: 1px solid var(--line);
+  padding: 0 18px 20px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  transform: translateY(20px);
+  transition: transform .27s cubic-bezier(.4,0,.2,1);
+}
+.theme-ov.open .theme-sh { transform: none; }
+.theme-handle { width: 32px; height: 3px; background: var(--line); border-radius: 2px; margin: 13px auto 16px; }
+.theme-section { margin-bottom: 20px; }
+.theme-label { font-size: 11px; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; margin-bottom: 10px; font-weight: 500; }
+.theme-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.swatch {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 2px solid transparent; cursor: pointer;
+  transition: all .16s; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-family: 'Noto Serif KR', serif;
+}
+.swatch:active { transform: scale(.88); }
+.swatch.cur { border-color: var(--accent); box-shadow: 0 0 0 2px var(--bg2), 0 0 0 4px var(--accent); }
+/* 폰트 크기 슬라이더 */
+.font-size-row { display: flex; align-items: center; gap: 12px; }
+.font-size-row span { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; min-width: 28px; text-align: center; }
+input[type=range] {
+  flex: 1; height: 4px; border-radius: 2px;
+  background: var(--line); outline: none;
+  -webkit-appearance: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px;
+  border-radius: 50%; background: var(--accent);
+  border: 2px solid var(--bg2); cursor: pointer;
+}
+/* 줄간격 */
+.line-height-row { display: flex; gap: 8px; }
+.lh-btn {
+  flex: 1; height: 36px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--line);
+  color: var(--text2); font-size: 11px; cursor: pointer;
+  transition: all .14s; font-family: 'Noto Sans KR', sans-serif;
+}
+.lh-btn.cur { background: rgba(200,169,110,.14); border-color: var(--accent); color: var(--accent); }
+
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="topbar">
+  <button class="tb-menu" onclick="onMenu()">☰</button>
+  <div class="tb-info">
+    <div class="tb-project">어둠 속의 재회 · 3/8</div>
+    <div class="tb-chapter" id="tbCh">3장 — 빗속의 고백</div>
+  </div>
+  <div class="tb-right">
+    <div class="tb-badge" id="lockBadge"><div class="tb-dot"></div>편집 중</div>
+    <button class="tb-btn" onclick="openDiff()">PR</button>
+    <button class="tb-btn primary" onclick="doCheckin()">체크인</button>
+  </div>
+</div>
+
+<div class="body">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+
+    <!-- 슬림 탭 (세로) -->
+    <div class="sb-slim">
+      <button class="st" onclick="onMenu()" title="목록 열기">
+        <span style="font-size:14px">≡</span>
+      </button>
+      <div class="st-divider"></div>
+      <button class="st" onclick="qj(0)"><span class="st-num">P</span></button>
+      <button class="st" onclick="qj(1)"><span class="st-num">01</span></button>
+      <button class="st" onclick="qj(2)"><span class="st-num">02</span></button>
+      <button class="st cur" onclick="qj(3)"><span class="st-num" style="color:var(--accent)">03</span><div class="st-dot"></div></button>
+      <button class="st" onclick="qj(4)"><span class="st-num" style="color:var(--blue)">04</span></button>
+      <button class="st" onclick="qj(5)"><span class="st-num">05</span></button>
+      <button class="st" onclick="qj(6)"><span class="st-num">EP</span></button>
+    </div>
+
+    <!-- 풀 사이드바 -->
+    <div class="sb-full">
+      <div class="sb-head">
+        <span class="sb-title">챕터</span>
+        <button class="sb-add" onclick="toast('새 챕터')">+</button>
+      </div>
+      <div class="ch-list">
+        <div class="chi" onclick="pick(this,'프롤로그','P')">
+          <div class="chi-n">PRO</div><div class="chi-t">프롤로그</div>
+          <div class="chi-s"><span>842자</span></div>
+        </div>
+        <div class="chi" onclick="pick(this,'1장 — 오래된 카페','01')">
+          <div class="chi-n">001</div><div class="chi-t">오래된 카페</div>
+          <div class="chi-s"><span>2,140자</span></div>
+        </div>
+        <div class="chi" onclick="pick(this,'2장 — 밤의 편지','02')">
+          <div class="chi-n">002</div><div class="chi-t">밤의 편지</div>
+          <div class="chi-s"><span>1,830자</span><span class="lm">✓</span></div>
+        </div>
+        <div class="chi cur" onclick="pick(this,'3장 — 빗속의 고백','03')">
+          <div class="chi-n">003</div><div class="chi-t">빗속의 고백</div>
+          <div class="chi-s"><span>1,247자</span><span class="lm">🔒 나</span></div>
+        </div>
+        <div class="chi" onclick="pick(this,'4장 — 아침의 침묵','04')">
+          <div class="chi-n">004</div><div class="chi-t">아침의 침묵</div>
+          <div class="chi-s"><span>—</span><span class="lo">@minji</span></div>
+        </div>
+        <div class="chi" onclick="pick(this,'5장 — 돌아오지 않는','05')">
+          <div class="chi-n">005</div><div class="chi-t">돌아오지 않는</div>
+          <div class="chi-s"><span>—</span></div>
+        </div>
+        <div class="chi" onclick="pick(this,'에필로그','EP')">
+          <div class="chi-n">EPI</div><div class="chi-t">에필로그</div>
+          <div class="chi-s"><span>—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDITOR -->
+  <div class="editor-wrap">
+    <div class="fmtbar">
+      <button class="fb" onclick="ex('bold')"><b>B</b></button>
+      <button class="fb" onclick="ex('italic')"><i>I</i></button>
+      <button class="fb" onclick="ex('underline')"><u>U</u></button>
+      <div class="fb-sep"></div>
+      <button class="fb" title="들여쓰기">⇥</button>
+      <button class="fb" title="내어쓰기">⇤</button>
+      <div class="fb-sep"></div>
+      <button class="fb" onclick="openSyn()">📋</button>
+      <button class="fb" onclick="toast('맞춤법 검사 중...')">✓</button>
+      <button class="fb" onclick="toggleMemo()">💬</button>
+      <div class="fb-sep"></div>
+      <button class="fb" id="wcBtn">1,247자</button>
+      <div class="fb-sep"></div>
+      <button class="fb" onclick="openTheme()" title="테마">🎨</button>
+    </div>
+
+    <div class="editor-scroll">
+      <input class="ch-title-input" id="chTitleInp" value="빗속의 고백">
+      <div class="editor-body" contenteditable="true" id="edBody" oninput="onInput()">
+<p>빗소리가 유리창을 두드렸다. 서준은 창밖을 바라보며 커피잔을 손에 쥔 채 오랫동안 움직이지 않았다. 이 도시의 비는 항상 이런 식이었다. 갑작스럽고, 무자비하고, 그리고 무언가를 떠올리게 만드는.</p>
+
+<p>"오래 기다렸어요?"</p>
+
+<p>목소리가 들렸다. 그는 천천히 고개를 돌렸다. <span class="mhl" onclick="toast('💬 @minji: 긴장감이 더 필요해요')">유이가 빗물이 뚝뚝 떨어지는 우산을 황급히 접으며 카페 안으로 들어서고 있었다.</span> 3년이었다. 3년이라는 시간이 그녀를 조금 다르게 만들었지만, 눈빛만은 그대로였다.</p>
+
+<p>"아니." 서준이 대답했다. 거짓말이었다.</p>
+
+<p>유이는 맞은편 의자를 당겨 앉았다. 빗물이 아직 그녀의 어깨에 남아 있었다. 두 사람 사이에 잠시 침묵이 흘렀고, 그 침묵은 놀랍도록 <span class="mhl" onclick="toast('💬 @junho: 더 구체적인 감각 표현이 좋을 것 같아요')">낯설고도 친밀했다</span>. 아니, 그 어떤 말로도 정확히 표현할 수 없었다.</p>
+
+<p>"할 말이 있다고 했잖아요."</p>
+
+<p>유이의 말이었다. 서준은 잠시 커피잔을 내려다보았다가, 천천히 고개를 들었다. 이 순간을 위해 수백 번을 연습했다. 하지만 막상 그녀의 눈을 바라보니, 준비했던 말들이 전부 무의미하게 느껴졌다.</p>
+      </div>
+    </div>
+
+    <div class="statusbar">
+      <div class="st-left">
+        <div class="tb-dot"></div>
+        <span class="st-i" id="stWc">1,247자</span>
+        <span class="st-i">v7</span>
+        <span class="st-i" id="stSv">저장됨</span>
+      </div>
+      <button class="st-save" onclick="doSave()">저장</button>
+    </div>
+  </div>
+
+  <!-- OVAL DOCK -->
+  <div class="oval-dock">
+    <div class="oval-group" id="og1">
+      <button class="oval-trig" onclick="tog('og1')"><span class="ot-ic">✏️</span><span class="ot-lb">편집</span></button>
+      <div class="oval-exp">
+        <div style="display:flex;flex-direction:column;gap:20px;padding:5px 2px">
+          <button class="sub" data-tip="굵게" onclick="ex('bold');closeOvals()"><b>B</b></button>
+          <button class="sub" data-tip="기울기" onclick="ex('italic');closeOvals()"><i>I</i></button>
+          <button class="sub" data-tip="밑줄" onclick="ex('underline');closeOvals()"><u>U</u></button>
+        </div>
+      </div>
+    </div>
+    <div class="oval-group" id="og2">
+      <button class="oval-trig" onclick="tog('og2')"><span class="ot-ic">¶</span><span class="ot-lb">구조</span></button>
+      <div class="oval-exp">
+        <div style="display:flex;flex-direction:column;gap:20px;padding:5px 2px">
+          <button class="sub" data-tip="들여쓰기" onclick="closeOvals()">⇥</button>
+          <button class="sub" data-tip="단락" onclick="closeOvals()">↵</button>
+          <button class="sub" data-tip="장구분" onclick="closeOvals()">━</button>
+        </div>
+      </div>
+    </div>
+    <div class="oval-group" id="og3">
+      <button class="oval-trig" onclick="tog('og3')"><span class="ot-ic">💬</span><span class="ot-lb">협업</span></button>
+      <div class="oval-exp">
+        <div style="display:flex;flex-direction:column;gap:20px;padding:5px 2px">
+          <button class="sub hi" data-tip="메모" onclick="toggleMemo();closeOvals()">📝</button>
+          <button class="sub" data-tip="시놉" onclick="openSyn();closeOvals()">📋</button>
+          <button class="sub" data-tip="PR" onclick="openDiff();closeOvals()">⇄</button>
+        </div>
+      </div>
+    </div>
+    <div class="oval-group" id="og4">
+      <button class="oval-trig" onclick="tog('og4')"><span class="ot-ic">🔧</span><span class="ot-lb">도구</span></button>
+      <div class="oval-exp">
+        <div style="display:flex;flex-direction:column;gap:20px;padding:5px 2px">
+          <button class="sub" data-tip="맞춤법" onclick="toast('맞춤법 검사 중...');closeOvals()">✓</button>
+          <button class="sub" data-tip="저장" onclick="doSave();closeOvals()">💾</button>
+          <button class="sub" data-tip="내보내기" onclick="toast('docx 저장 중...');closeOvals()">↑</button>
+          <button class="sub" data-tip="테마" onclick="openTheme();closeOvals()">🎨</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MEMO PANEL -->
+  <div class="memo-panel" id="memoPanel">
+    <div class="mp-head">
+      <span class="mp-title">💬 메모</span>
+      <button class="mp-x" onclick="toggleMemo()">✕</button>
+    </div>
+    <div class="mp-tabs">
+      <button class="mp-tab on" onclick="mpTab(this)">미해결 2</button>
+      <button class="mp-tab" onclick="mpTab(this)">전체 5</button>
+      <button class="mp-tab" onclick="mpTab(this)">완료 3</button>
+    </div>
+    <div class="mp-body">
+      <div class="mc">
+        <div class="mc-u"><span>@minji</span><span style="color:var(--muted)">방금</span></div>
+        <div class="mc-t">여기 긴장감이 더 필요하지 않아? 유이가 들어오는 장면이 너무 평온하게 느껴져요.</div>
+        <div class="mc-a">↳ "유이가 빗물이 뚝뚝..."</div>
+        <div class="mc-acts"><button class="mc-btn" onclick="toast('답글')">답글</button><button class="mc-btn" onclick="toast('✓ 해결 완료')">✓ 해결</button></div>
+      </div>
+      <div class="mc">
+        <div class="mc-u"><span>@junho</span><span style="color:var(--muted)">1시간 전</span></div>
+        <div class="mc-t">"편안했다"보다 더 구체적인 감각 표현이 좋을 것 같아요.</div>
+        <div class="mc-a">↳ "낯설고도 친밀했다"</div>
+        <div class="mc-acts"><button class="mc-btn" onclick="toast('답글')">답글</button><button class="mc-btn" onclick="toast('✓ 해결 완료')">✓ 해결</button></div>
+      </div>
+      <div class="mc done">
+        <div class="mc-u"><span>@minji</span><span style="color:var(--muted)">어제</span></div>
+        <div class="mc-t">프롤로그와 연결되는 복선이 필요할 것 같아요.</div>
+        <div class="mc-a">↳ "이 도시의 비는..."</div>
+        <div class="mc-acts"><button class="mc-btn">✓ 완료</button></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- SYNOPSIS -->
+<div class="syn-ov" id="synOv" onclick="closeSynBg(event)">
+  <div class="syn-bg"></div>
+  <div class="syn-sh">
+    <div class="syn-handle"></div>
+    <div class="syn-top">
+      <div class="syn-ttl">📋 시놉시스 & 전개 방향</div>
+      <span class="syn-ver">v4 · 2일 전</span>
+    </div>
+    <div class="syn-txt">
+      <b>전체 방향</b><br>2018년 서울. 3년 만에 재회한 두 남녀의 이야기. 과거의 오해와 현재의 감정이 교차하며, 둘 다 상대를 잃은 이유를 알고 있지만 말하지 못한다.<br><br>
+      <b>3장 핵심</b><br>서준이 먼저 연락해 카페에서 만남. 유이는 그가 왜 연락했는지 알면서도 모른 척한다. 이 장의 마지막에서 서준이 말을 꺼내려다 실패해야 함.<br><br>
+      <b>다음 장 연결</b><br>4장은 다음 날 아침, 유이 시점으로 전환. 서준의 문자를 받고 답하지 않는 장면으로 시작.
+    </div>
+  </div>
+</div>
+
+<!-- DIFF -->
+<div class="diff-modal" id="diffModal">
+  <div class="diff-head">
+    <button class="diff-x" onclick="closeDiff()">✕</button>
+    <div class="diff-hi">
+      <div class="diff-ttl">@minji의 수정 제안 — 3장</div>
+      <div class="diff-sub">PR #7 · 2시간 전 · 변경 2곳</div>
+    </div>
+    <button class="tb-btn" onclick="toast('맞춤법 검사 중...')">✓</button>
+  </div>
+  <div class="diff-body">
+    <div class="diff-col">
+      <div class="diff-col-lbl"><i style="background:var(--red)"></i>이전 v6</div>
+      <div class="diff-txt">
+        유이가 <span class="dd">젖은 우산을 접으며</span> 카페 안으로 들어서고 있었다.<br><br>
+        그 침묵은 놀랍도록 <span class="dd">편안했다</span>. 아니, 편안하다는 말은 틀렸다.
+      </div>
+    </div>
+    <div class="diff-col">
+      <div class="diff-col-lbl"><i style="background:var(--green)"></i>minji 제안</div>
+      <div class="diff-txt">
+        유이가 <span class="da">빗물이 뚝뚝 떨어지는 우산을 황급히 접으며</span> 카페 안으로 들어서고 있었다.<br><br>
+        그 침묵은 놀랍도록 <span class="da">낯설고도 친밀했다</span>. 아니, 그 어떤 말로도 정확히 표현할 수 없었다.
+      </div>
+    </div>
+  </div>
+  <div class="diff-foot">
+    <button class="dact rej" onclick="closeDiff();toast('제안 거절됨')">❌ 거절</button>
+    <button class="dact acc" onclick="closeDiff();toast('✓ 머지 완료!')">✅ 머지 승인</button>
+  </div>
+</div>
+
+
+<!-- THEME PANEL -->
+<div class="theme-ov" id="themeOv" onclick="closeThemeBg(event)">
+  <div class="theme-bg"></div>
+  <div class="theme-sh">
+    <div class="theme-handle"></div>
+
+    <div class="theme-section">
+      <div class="theme-label">배경 색상</div>
+      <div class="theme-swatches" id="bgSwatches">
+        <div class="swatch cur" data-bg="#0f0e0c" data-bg2="#181714" data-surface="#2a2720" data-line="#3d3930" style="background:#0f0e0c;border-color:var(--accent);box-shadow:0 0 0 2px var(--bg2),0 0 0 4px var(--accent)"><span style="color:#7a7060;font-size:8px">밤</span></div>
+        <div class="swatch" data-bg="#1a1a2e" data-bg2="#16213e" data-surface="#0f3460" data-line="#2a3560" style="background:#1a1a2e"><span style="color:#8888aa;font-size:8px">밤바다</span></div>
+        <div class="swatch" data-bg="#1c1410" data-bg2="#241a12" data-surface="#332214" data-line="#442c18" style="background:#1c1410"><span style="color:#7a5a40;font-size:8px">세피아</span></div>
+        <div class="swatch" data-bg="#f5f0e8" data-bg2="#ece6d8" data-surface="#ddd6c6" data-line="#c8bfae" style="background:#f5f0e8"><span style="color:#8a7a60;font-size:8px">양피지</span></div>
+        <div class="swatch" data-bg="#fafaf8" data-bg2="#f0f0ec" data-surface="#e4e4de" data-line="#ccccC4" style="background:#fafaf8"><span style="color:#888880;font-size:8px">화이트</span></div>
+        <div class="swatch" data-bg="#0d1b0e" data-bg2="#142016" data-surface="#1e3020" data-line="#2a4030" style="background:#0d1b0e"><span style="color:#4a7050;font-size:8px">숲</span></div>
+      </div>
+    </div>
+
+    <div class="theme-section">
+      <div class="theme-label">글씨 색상</div>
+      <div class="theme-swatches" id="textSwatches">
+        <div class="swatch cur" data-color="#e8e0d0" style="background:#e8e0d0"><span style="color:#888;font-size:8px">아이보리</span></div>
+        <div class="swatch" data-color="#ffffff" style="background:#ffffff"><span style="color:#888;font-size:8px">흰색</span></div>
+        <div class="swatch" data-color="#d4c9a8" style="background:#d4c9a8"><span style="color:#888;font-size:8px">크림</span></div>
+        <div class="swatch" data-color="#2c2416" style="background:#2c2416"><span style="color:#aaa;font-size:8px">먹</span></div>
+        <div class="swatch" data-color="#1a1a1a" style="background:#1a1a1a"><span style="color:#aaa;font-size:8px">검정</span></div>
+        <div class="swatch" data-color="#c8b88a" style="background:#c8b88a"><span style="color:#888;font-size:8px">황갈</span></div>
+      </div>
+    </div>
+
+    <div class="theme-section">
+      <div class="theme-label">글씨 크기</div>
+      <div class="font-size-row">
+        <span style="font-size:12px">가</span>
+        <input type="range" id="fontSizeSlider" min="13" max="22" value="16" oninput="applyFontSize(this.value)">
+        <span style="font-size:18px">가</span>
+        <span id="fontSizeVal">16px</span>
+      </div>
+    </div>
+
+    <div class="theme-section" style="margin-bottom:0">
+      <div class="theme-label">줄 간격</div>
+      <div class="line-height-row">
+        <button class="lh-btn" onclick="applyLineH('1.7',this)">좁게</button>
+        <button class="lh-btn cur" onclick="applyLineH('2.1',this)">보통</button>
+        <button class="lh-btn" onclick="applyLineH('2.5',this)">넓게</button>
+        <button class="lh-btn" onclick="applyLineH('3.0',this)">여유</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toastEl"></div>
+
+<script>
+// 세로/가로
+const isPort = () => window.matchMedia('(orientation: portrait)').matches;
+let pOpen = false;
+
+function onMenu() {
+  if (!isPort()) return;
+  pOpen = !pOpen;
+  document.getElementById('sidebar').classList.toggle('p-open', pOpen);
+}
+window.addEventListener('resize', () => {
+  if (!isPort()) { pOpen = false; document.getElementById('sidebar').classList.remove('p-open'); }
+});
+
+// 에디터 포커스 시 세로 사이드바 닫기
+document.getElementById('edBody').addEventListener('focus', () => {
+  if (isPort() && pOpen) { pOpen = false; document.getElementById('sidebar').classList.remove('p-open'); }
+  closeOvals();
+});
+
+// 챕터
+function pick(el, name) {
+  document.querySelectorAll('.chi').forEach(i => i.classList.remove('cur'));
+  el.classList.add('cur');
+  document.getElementById('tbCh').textContent = name;
+  document.getElementById('chTitleInp').value = name.replace(/^\d+장 — /, '');
+  if (isPort()) { pOpen = false; document.getElementById('sidebar').classList.remove('p-open'); }
+}
+function qj(i) { document.querySelectorAll('.chi')[i]?.click(); }
+
+// 오벌
+function tog(id) {
+  const g = document.getElementById(id), was = g.classList.contains('open');
+  closeOvals();
+  if (!was) { g.classList.add('open'); g.querySelector('.oval-trig').classList.add('on'); }
+}
+function closeOvals() {
+  document.querySelectorAll('.oval-group').forEach(g => g.classList.remove('open'));
+  document.querySelectorAll('.oval-trig').forEach(t => t.classList.remove('on'));
+}
+document.getElementById('edBody').addEventListener('click', closeOvals);
+
+// 메모
+let mOpen = false;
+function toggleMemo() { mOpen = !mOpen; document.getElementById('memoPanel').classList.toggle('open', mOpen); }
+function mpTab(b) { document.querySelectorAll('.mp-tab').forEach(t => t.classList.remove('on')); b.classList.add('on'); }
+
+// 시놉
+function openSyn() { document.getElementById('synOv').classList.add('open'); }
+function closeSynBg(e) { if (e.target === e.currentTarget || e.target.classList.contains('syn-bg')) document.getElementById('synOv').classList.remove('open'); }
+
+// diff
+function openDiff() { document.getElementById('diffModal').classList.add('open'); }
+function closeDiff() { document.getElementById('diffModal').classList.remove('open'); }
+
+// 체크인
+function doCheckin() {
+  toast('체크인 완료 — PR 제출됨');
+  const b = document.getElementById('lockBadge');
+  b.innerHTML = '<div class="tb-dot" style="background:var(--accent)"></div>저장됨';
+  b.style.cssText = 'background:rgba(200,169,110,.1);border:1px solid rgba(200,169,110,.28);border-radius:12px;padding:4px 9px;font-size:11px;color:var(--accent);display:flex;align-items:center;gap:4px';
+}
+
+// 포맷
+function ex(cmd) { document.execCommand(cmd, false, null); document.getElementById('edBody').focus(); }
+
+// 저장/글자수
+let svTimer;
+function onInput() {
+  const n = document.getElementById('edBody').innerText.replace(/\s/g,'').length;
+  const s = n.toLocaleString() + '자';
+  document.getElementById('stWc').textContent = s;
+  document.getElementById('wcBtn').textContent = s;
+  document.getElementById('stSv').textContent = '수정 중...';
+  document.getElementById('stSv').style.color = 'var(--accent)';
+  clearTimeout(svTimer);
+  svTimer = setTimeout(() => { document.getElementById('stSv').textContent = '저장됨'; document.getElementById('stSv').style.color = ''; }, 1400);
+}
+function doSave() {
+  document.getElementById('stSv').textContent = '저장 중...';
+  setTimeout(() => { document.getElementById('stSv').textContent = '저장됨'; toast('저장 완료'); }, 500);
+}
+
+// 토스트
+let tTimer;
+function toast(msg) {
+  const el = document.getElementById('toastEl');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(tTimer);
+  tTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ─── 테마 ──────────────────────────────────────────
+function openTheme() { document.getElementById('themeOv').classList.add('open'); }
+function closeThemeBg(e) {
+  if (e.target === e.currentTarget || e.target.classList.contains('theme-bg'))
+    document.getElementById('themeOv').classList.remove('open');
+}
+
+// 배경 스와치
+document.querySelectorAll('#bgSwatches .swatch').forEach(sw => {
+  sw.addEventListener('click', function() {
+    document.querySelectorAll('#bgSwatches .swatch').forEach(s => {
+      s.style.borderColor = 'transparent';
+      s.style.boxShadow = 'none';
+    });
+    this.style.borderColor = 'var(--accent)';
+    this.style.boxShadow = '0 0 0 2px var(--bg2), 0 0 0 4px var(--accent)';
+    // CSS 변수 업데이트
+    const r = document.documentElement.style;
+    r.setProperty('--bg',      this.dataset.bg);
+    r.setProperty('--bg2',     this.dataset.bg2);
+    r.setProperty('--surface', this.dataset.surface);
+    r.setProperty('--line',    this.dataset.line);
+    // 어두운/밝은 배경 자동 조정
+    const isDark = parseInt(this.dataset.bg.slice(1,3),16) < 100;
+    r.setProperty('--muted',   isDark ? '#7a7060' : '#9a8a70');
+    r.setProperty('--surface2', isDark ? '#343028' : '#ccbfaa');
+    toast('배경 색상 적용됨');
+  });
+});
+
+// 글씨 스와치
+document.querySelectorAll('#textSwatches .swatch').forEach(sw => {
+  sw.addEventListener('click', function() {
+    document.querySelectorAll('#textSwatches .swatch').forEach(s => {
+      s.style.borderColor = 'transparent';
+      s.style.boxShadow = 'none';
+    });
+    this.style.borderColor = 'var(--accent)';
+    this.style.boxShadow = '0 0 0 2px var(--bg2), 0 0 0 4px var(--accent)';
+    document.documentElement.style.setProperty('--text', this.dataset.color);
+    // text2 자동 파생
+    toast('글씨 색상 적용됨');
+  });
+});
+
+// 폰트 크기
+function applyFontSize(v) {
+  document.getElementById('fontSizeVal').textContent = v + 'px';
+  document.getElementById('edBody').style.fontSize = v + 'px';
+  document.getElementById('chTitleInp').style.fontSize = (parseInt(v)+4) + 'px';
+}
+
+// 줄간격
+function applyLineH(v, btn) {
+  document.querySelectorAll('.lh-btn').forEach(b => b.classList.remove('cur'));
+  btn.classList.add('cur');
+  document.getElementById('edBody').style.lineHeight = v;
+}
+
+</script>
+</body>
+</html>
